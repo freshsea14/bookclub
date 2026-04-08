@@ -135,7 +135,7 @@ textarea{resize:none;line-height:1.65;}
 .stars{display:flex;gap:3px;}
 .star{width:11px;height:11px;border-radius:50%;}
 .s-on{background:#EF9F27;}.s-off{background:var(--gray-100);}
-.book-input-card{background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;}
+
 @media(max-width:380px){.two-col{grid-template-columns:1fr;}.tab-btn{font-size:11px;}}
 </style>
 </head>
@@ -314,26 +314,15 @@ async function startApp(){
   hideLoading();renderSugs();
 }
 
-async function api(params){
-  const url=SCRIPT_URL+'?'+new URLSearchParams(params);
-  const res=await fetch(url,{redirect:'follow'});
-  const text=await res.text();
-  try{return JSON.parse(text);}catch{throw new Error('응답 파싱 실패: '+text.slice(0,100));}
-}
-async function apiPost(body){
-  // Apps Script JSONP: GET + callback 파라미터로 쓰기 요청
+function jsonp(params){
   return new Promise((resolve,reject)=>{
-    const cbName='_cb'+Date.now();
-    const params=new URLSearchParams({
-      callback:cbName,
-      payload:JSON.stringify(body)
-    });
-    const url=SCRIPT_URL+'?'+params;
+    const cbName='_cb'+Date.now()+'_'+Math.random().toString(36).slice(2);
+    params.callback=cbName;
+    const url=SCRIPT_URL+'?'+new URLSearchParams(params);
     const script=document.createElement('script');
     script.type='text/javascript';
     const timer=setTimeout(()=>{
-      cleanup();
-      reject(new Error('요청 시간 초과 (15초)'));
+      cleanup();reject(new Error('요청 시간 초과'));
     },15000);
     function cleanup(){
       clearTimeout(timer);
@@ -343,15 +332,18 @@ async function apiPost(body){
     window[cbName]=(data)=>{
       cleanup();
       if(data&&data.error)reject(new Error(data.error));
-      else resolve(data||{ok:true});
+      else resolve(data||{});
     };
     script.addEventListener('error',()=>{
-      cleanup();
-      reject(new Error('네트워크 오류 — URL을 확인해주세요'));
+      cleanup();reject(new Error('네트워크 오류'));
     });
     document.head.appendChild(script);
     script.src=url;
   });
+}
+async function api(params){return jsonp(params);}
+async function apiPost(body){
+  return jsonp({payload:JSON.stringify(body)});
 }
 
 function showLoading(t='저장 중...'){document.getElementById('loading').classList.add('show');document.getElementById('loading-text').textContent=t;}
@@ -360,7 +352,14 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
 
 function monthKey(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;}
 function monthLabel(k){const[y,m]=k.split('-');return `${y}년 ${parseInt(m)}월`;}
-function fmtDate(d){if(!d)return'미정';const dt=new Date(d+'T00:00:00');return `${dt.getFullYear()}년 ${dt.getMonth()+1}월 ${dt.getDate()}일`;}
+function fmtDate(d){
+  if(!d||d==='미정'||String(d).trim()==='')return'미정';
+  const s=String(d).trim();
+  // ISO 형식(2026-04-10T...) 또는 yyyy-mm-dd 파싱
+  const m=s.match(/(\d{4})[-.\/](\d{1,2})[-.\/](\d{1,2})/);
+  if(m)return `${m[1]}년 ${parseInt(m[2])}월 ${parseInt(m[3])}일`;
+  return s;
+}
 
 // 5번: 멤버 선택 — localStorage에 저장해서 앱 재진입 시에도 유지
 function renderMembers(){
@@ -454,9 +453,11 @@ async function loadMonths(){try{const r=await api({action:'getMonths'});allMonth
 async function loadNext(){
   try{
     const n=await api({action:'getNext'});
-    document.getElementById('nd-val').textContent=n.date?fmtDate(n.date):'미정';
-    document.getElementById('nb-val').textContent=n.book||'미정';
-  }catch{}
+    const dateVal=n.date&&String(n.date).trim()?fmtDate(String(n.date).trim()):'미정';
+    const bookVal=n.book&&String(n.book).trim()?String(n.book).trim():'미정';
+    document.getElementById('nd-val').textContent=dateVal;
+    document.getElementById('nb-val').textContent=bookVal;
+  }catch(e){console.error('loadNext error',e);}
 }
 
 function renderFeed(type){
@@ -549,6 +550,8 @@ async function saveNext(f){
 
 async function renderReport(){
   const body=document.getElementById('report-body');const strip=document.getElementById('report-strip');const label=document.getElementById('rpt-label');
+  // allMonths 최신 로드
+  await loadMonths();
   if(!allMonths.length){strip.innerHTML='';label.textContent='';body.innerHTML=`<div class="empty-msg">아직 기록된 모임이 없어요.<br>문장이나 생각을 남기면 보고서가 생겨요!</div>`;return;}
   if(rptIdx>=allMonths.length)rptIdx=allMonths.length-1;
   if(rptIdx<0)rptIdx=0;
@@ -600,9 +603,7 @@ function renderRptBody(mk,color,data){
       <div class="panel"><div class="panel-ttl">기억에 남는 생각</div>${thoughts.length?thoughts.slice(0,3).map(t=>`<div class="rt"><div class="rt-top"><div class="av ${AV_CLS[parseInt(t.member)]}" style="width:20px;height:20px;font-size:10px;">${MEMBERS[parseInt(t.member)][0]}</div><span class="rt-name">${MEMBERS[parseInt(t.member)]}</span></div>${t.text?`<div class="rt-text">${t.text}</div>`:''}</div>`).join(''):'<div style="font-size:13px;color:var(--text-hint);">없음</div>'}</div>
     </div>
     ${Object.keys(rbm).length?`<div class="rating-card"><div class="card-title" style="margin-bottom:10px;">각자의 별점</div>${MEMBERS.map((name,i)=>{const s=rbm[i];if(!s)return'';return `<div class="rating-row"><div class="av ${AV_CLS[i]}" style="width:24px;height:24px;font-size:11px;">${name[0]}</div><span class="r-name">${name}</span><div class="stars">${Array.from({length:5},(_,si)=>`<div class="star ${si<s?'s-on':'s-off'}"></div>`).join('')}</div></div>`;}).join('')}</div>`:''}
-    <div class="book-input-card"><div class="card-title" style="margin-bottom:10px;">이달 책 제목</div>
-      <div class="edit-row"><input type="text" id="book-title-input" placeholder="이 달에 읽은 책 제목" value="${bookTitle}"><button class="btn-save" onclick="saveRptBook('${mk}')">저장</button></div>
-    </div>`;
+  `;
 }
 
 function toggleRptBookEdit(mk){
