@@ -507,10 +507,8 @@ function renderFeed(type){
     const safeMi=(isNaN(mi)||mi<0||mi>=MEMBERS.length)?0:mi;
     const name=MEMBERS[safeMi];
     const avCls=AV_CLS[safeMi];
-    const tags=Array.isArray(item.keywords)
-      ?item.keywords.map(k=>`<span class="feed-tag">${k}</span>`).join('')
-      :(item.keywords?String(item.keywords).split(',').filter(Boolean).map(k=>`<span class="feed-tag">${k}</span>`).join(''))
-      :'';
+    const kwArr=Array.isArray(item.keywords)?item.keywords:(item.keywords?String(item.keywords).split(',').filter(Boolean):[]);
+    const tags=kwArr.map(k=>`<span class="feed-tag">${k}</span>`).join('');
     const isMine=safeMi===currentMember;
     const delBtn=isMine?`<button class="btn-delete" onclick="deleteItem('${type}','${item.id}')" title="삭제">×</button>`:'';
     if(type==='quotes')return `<div class="feed-item"><div class="feed-top"><div class="av ${avCls}">${name[0]}</div><span class="feed-author">${name}</span>${item.page?`<span class="feed-page" style="margin-left:6px;">p.${item.page}</span>`:''}<span style="margin-left:auto;">${delBtn}</span></div>${item.quote?`<div class="feed-quote">"${item.quote}"</div>`:''}${item.memo?`<div class="feed-text" style="margin-top:6px;">${item.memo}</div>`:''}${tags?`<div class="feed-tags">${tags}</div>`:''}</div>`;
