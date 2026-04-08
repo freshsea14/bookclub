@@ -553,8 +553,15 @@ function renderRptBody(mk,color,data){
   const ratings=Object.values(rbm);const avg=ratings.length?(ratings.reduce((s,r)=>s+r,0)/ratings.length).toFixed(1):null;
 
   document.getElementById('report-body').innerHTML=`
-    <div class="book-banner"><div class="rpt-spine" style="background:${color}"></div><div>
-      <div class="rpt-book-title">${bookTitle||'(책 제목 미입력)'}</div>
+    <div class="book-banner"><div class="rpt-spine" style="background:${color}"></div><div style="flex:1;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="rpt-book-title" id="rpt-book-title-display" style="${bookTitle?'':'color:var(--text-hint);font-size:14px;font-weight:400;'}">${bookTitle||'책 제목을 입력해주세요'}</div>
+        <button class="btn-edit" onclick="toggleRptBookEdit('${mk}')" id="rpt-book-edit-btn">수정</button>
+      </div>
+      <div id="rpt-book-edit-row" style="display:none;" class="edit-row" style="margin-top:6px;">
+        <input type="text" id="rpt-book-input" placeholder="책 제목 입력" value="${bookTitle}">
+        <button class="btn-save" onclick="saveRptBook('${mk}')">저장</button>
+      </div>
       <div class="rpt-book-date">${monthLabel(mk)}</div>
       ${avg?`<div class="avg-badge">★ 평균 ${avg}</div>`:''}
     </div></div>
@@ -574,11 +581,36 @@ function renderRptBody(mk,color,data){
     </div>`;
 }
 
+function toggleRptBookEdit(mk){
+  const row=document.getElementById('rpt-book-edit-row');
+  const isOpen=row.style.display!=='none';
+  row.style.display=isOpen?'none':'flex';
+}
 async function saveRptBook(mk){
-  const v=document.getElementById('book-title-input').value.trim();
+  const v=document.getElementById('rpt-book-input').value.trim();
   showLoading('저장 중...');
-  try{await apiPost({action:'saveBook',month:mk,title:v});showToast('책 제목을 저장했어요!');await renderReport();}
-  catch{showToast('저장에 실패했어요.');}
+  try{
+    await apiPost({action:'saveBook',month:mk,title:v});
+    // 화면 즉시 반영
+    const titleEl=document.getElementById('rpt-book-title-display');
+    if(titleEl){
+      titleEl.textContent=v||'책 제목을 입력해주세요';
+      titleEl.style.color=v?'':'var(--text-hint)';
+      titleEl.style.fontSize=v?'':'14px';
+      titleEl.style.fontWeight=v?'':'400';
+    }
+    document.getElementById('rpt-book-edit-row').style.display='none';
+    // 스트립 제목도 즉시 업데이트
+    const idx=allMonths.indexOf(mk);
+    if(idx>=0){const el=document.getElementById('st-'+idx);if(el)el.textContent=v||'(미입력)';}
+    // 이번 달이면 입력탭 책 제목도 동기화
+    if(mk===monthKey()){
+      document.getElementById('cur-book-val').textContent=v||'미정';
+      document.getElementById('cur-book-val2').textContent=v||'미정';
+      if(cachedData)cachedData.book=v;
+    }
+    showToast('책 제목을 저장했어요!');
+  }catch{showToast('저장에 실패했어요.');}
   hideLoading();
 }
 function goRpt(i){rptIdx=i;renderReport();}
