@@ -290,7 +290,7 @@ textarea{resize:none;line-height:1.65;}
 const MEMBERS=['계희','미선','나형'];
 const AV_CLS=['av-0','av-1','av-2'];
 const SPINE_COLORS=['#7F77DD','#1D9E75','#D85A30','#378ADD','#BA7517','#D4537E','#534AB7','#0F6E56'];
-let SCRIPT_URL=localStorage.getItem('bcScriptUrl')||'';
+let SCRIPT_URL='https://script.google.com/macros/s/AKfycbwL89-KayC7JjZtOxx0dl9UjvW9yiDalXlSxngcI4-I_mEr9wJp5masn1wPcgPsxjFX/exec';
 // 5번: 멤버 선택 유지 — localStorage에서 복원
 let currentMember=parseInt(localStorage.getItem('bcMember')||'0');
 let myTags={q:[],t:[]};
@@ -299,10 +299,7 @@ let rptIdx=0;
 let cachedData=null;
 let allMonths=[];
 
-window.onload=()=>{
-  if(!SCRIPT_URL){document.getElementById('setup-screen').style.display='flex';}
-  else{startApp();}
-};
+window.onload=()=>{startApp();};
 
 function saveScriptUrl(){
   const url=document.getElementById('script-url-input').value.trim();
