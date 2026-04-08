@@ -448,12 +448,26 @@ function setStar(n){myStars=n;renderStars();}
 
 async function loadMonthData(){
   try{
-    cachedData=await api({action:'getAll',month:monthKey()});
+    const res=await api({action:'getAll',month:monthKey()});
+    // 데이터 안전 처리
+    cachedData={
+      quotes:Array.isArray(res.quotes)?res.quotes:[],
+      thoughts:Array.isArray(res.thoughts)?res.thoughts:[],
+      book:res.book||''
+    };
+    // keywords가 문자열로 오면 배열로 변환
+    cachedData.quotes.forEach(q=>{
+      if(!Array.isArray(q.keywords))q.keywords=q.keywords?String(q.keywords).split(',').filter(Boolean):[];
+    });
+    cachedData.thoughts.forEach(t=>{
+      if(!Array.isArray(t.keywords))t.keywords=t.keywords?String(t.keywords).split(',').filter(Boolean):[];
+      t.stars=Number(t.stars)||0;
+    });
     const bookTitle=cachedData.book||'';
     document.getElementById('cur-book-val').textContent=bookTitle||'미정';
     document.getElementById('cur-book-val2').textContent=bookTitle||'미정';
     renderFeed('quotes');renderFeed('thoughts');
-  }catch(e){showToast('데이터를 불러오지 못했어요.');}
+  }catch(e){console.error('loadMonthData error',e);showToast('데이터를 불러오지 못했어요: '+e.message);}
 }
 async function loadMonths(){try{const r=await api({action:'getMonths'});allMonths=r.months||[];}catch{}}
 async function loadNext(){
@@ -485,15 +499,23 @@ async function loadNextHistory(){
 function renderFeed(type){
   const items=type==='quotes'?(cachedData?.quotes||[]):(cachedData?.thoughts||[]);
   const el=document.getElementById(`${type}-feed`);
+  if(!el)return;
   if(!items.length){el.innerHTML=`<div class="empty-msg">아직 기록이 없어요.<br>첫 번째로 남겨보세요!</div>`;return;}
   el.innerHTML=[...items].reverse().map(item=>{
     const mi=parseInt(item.member);
-    const tags=(item.keywords||[]).map(k=>`<span class="feed-tag">${k}</span>`).join('');
-    const isMine=mi===currentMember;
+    // member 인덱스가 유효하지 않으면 안전하게 처리
+    const safeMi=(isNaN(mi)||mi<0||mi>=MEMBERS.length)?0:mi;
+    const name=MEMBERS[safeMi];
+    const avCls=AV_CLS[safeMi];
+    const tags=Array.isArray(item.keywords)
+      ?item.keywords.map(k=>`<span class="feed-tag">${k}</span>`).join('')
+      :(item.keywords?String(item.keywords).split(',').filter(Boolean).map(k=>`<span class="feed-tag">${k}</span>`).join(''))
+      :'';
+    const isMine=safeMi===currentMember;
     const delBtn=isMine?`<button class="btn-delete" onclick="deleteItem('${type}','${item.id}')" title="삭제">×</button>`:'';
-    if(type==='quotes')return `<div class="feed-item"><div class="feed-top"><div class="av ${AV_CLS[mi]}">${MEMBERS[mi][0]}</div><span class="feed-author">${MEMBERS[mi]}</span>${item.page?`<span class="feed-page" style="margin-left:6px;">p.${item.page}</span>`:''} ${delBtn}</div>${item.quote?`<div class="feed-quote">"${item.quote}"</div>`:''}${item.memo?`<div class="feed-text" style="margin-top:6px;">${item.memo}</div>`:''}${tags?`<div class="feed-tags">${tags}</div>`:''}</div>`;
-    const sh=item.stars>0?`<div style="display:flex;gap:3px;margin-top:6px;">${Array.from({length:5},(_,i)=>`<div class="star ${i<item.stars?'s-on':'s-off'}"></div>`).join('')}</div>`:'';
-    return `<div class="feed-item"><div class="feed-top"><div class="av ${AV_CLS[mi]}">${MEMBERS[mi][0]}</div><span class="feed-author">${MEMBERS[mi]}</span> ${delBtn}</div>${item.text?`<div class="feed-text">${item.text}</div>`:''}${sh}${tags?`<div class="feed-tags">${tags}</div>`:''}</div>`;
+    if(type==='quotes')return `<div class="feed-item"><div class="feed-top"><div class="av ${avCls}">${name[0]}</div><span class="feed-author">${name}</span>${item.page?`<span class="feed-page" style="margin-left:6px;">p.${item.page}</span>`:''}<span style="margin-left:auto;">${delBtn}</span></div>${item.quote?`<div class="feed-quote">"${item.quote}"</div>`:''}${item.memo?`<div class="feed-text" style="margin-top:6px;">${item.memo}</div>`:''}${tags?`<div class="feed-tags">${tags}</div>`:''}</div>`;
+    const sh=Number(item.stars)>0?`<div style="display:flex;gap:3px;margin-top:6px;">${Array.from({length:5},(_,si)=>`<div class="star ${si<Number(item.stars)?'s-on':'s-off'}"></div>`).join('')}</div>`:'';
+    return `<div class="feed-item"><div class="feed-top"><div class="av ${avCls}">${name[0]}</div><span class="feed-author">${name}</span><span style="margin-left:auto;">${delBtn}</span></div>${item.text?`<div class="feed-text">${item.text}</div>`:''}${sh}${tags?`<div class="feed-tags">${tags}</div>`:''}</div>`;
   }).join('');
 }
 
@@ -516,22 +538,26 @@ async function deleteItem(type,id){
   hideLoading();
 }
 
-// 2번: 문장/생각 모두 선택 입력 — 아무것도 없어도 저장 가능, 단 완전히 빈 경우만 막음
 async function submitQuote(){
   const quote=document.getElementById('q-quote').value.trim();
   const memo=document.getElementById('q-memo').value.trim();
   const page=document.getElementById('q-page').value.trim();
   if(!quote&&!memo&&!page&&myTags.q.length===0){showToast('최소 한 가지는 입력해주세요.');return;}
-  const btn=document.getElementById('q-submit');btn.disabled=true;showLoading('기록 저장 중...');
+  const btn=document.getElementById('q-submit');btn.disabled=true;showLoading('저장 중...');
   try{
     const mk=monthKey();
     const data={id:String(Date.now()),month:mk,member:currentMember,quote,page,memo,keywords:myTags.q,ts:Date.now()};
     await apiPost({action:'addQuote',data});
-    if(!cachedData)cachedData={quotes:[],thoughts:[],book:''};
-    cachedData.quotes.push(data);
-    document.getElementById('q-quote').value='';document.getElementById('q-page').value='';document.getElementById('q-memo').value='';
-    myTags.q=[];renderTags('q');renderFeed('quotes');
+    // 입력창 초기화
+    document.getElementById('q-quote').value='';
+    document.getElementById('q-page').value='';
+    document.getElementById('q-memo').value='';
+    myTags.q=[];renderTags('q');
     if(!allMonths.includes(mk)){allMonths.push(mk);allMonths.sort();}
+    // 서버에서 새로 불러와서 피드 갱신
+    showLoading('목록 불러오는 중...');
+    await loadMonthData();
+    renderSugs();
     showToast('문장을 기록했어요!');
   }catch(e){console.error(e);showToast('저장 실패: '+e.message);}
   btn.disabled=false;hideLoading();
@@ -540,16 +566,19 @@ async function submitQuote(){
 async function submitThought(){
   const text=document.getElementById('t-text').value.trim();
   if(!text&&myTags.t.length===0&&myStars===0){showToast('최소 한 가지는 입력해주세요.');return;}
-  const btn=document.getElementById('t-submit');btn.disabled=true;showLoading('기록 저장 중...');
+  const btn=document.getElementById('t-submit');btn.disabled=true;showLoading('저장 중...');
   try{
     const mk=monthKey();
     const data={id:String(Date.now()),month:mk,member:currentMember,text,keywords:myTags.t,stars:myStars,ts:Date.now()};
     await apiPost({action:'addThought',data});
-    if(!cachedData)cachedData={quotes:[],thoughts:[],book:''};
-    cachedData.thoughts.push(data);
+    // 입력창 초기화
     document.getElementById('t-text').value='';
-    myTags.t=[];myStars=0;renderTags('t');renderStars();renderFeed('thoughts');
+    myTags.t=[];myStars=0;renderTags('t');renderStars();
     if(!allMonths.includes(mk)){allMonths.push(mk);allMonths.sort();}
+    // 서버에서 새로 불러와서 피드 갱신
+    showLoading('목록 불러오는 중...');
+    await loadMonthData();
+    renderSugs();
     showToast('생각을 기록했어요!');
   }catch(e){console.error(e);showToast('저장 실패: '+e.message);}
   btn.disabled=false;hideLoading();
