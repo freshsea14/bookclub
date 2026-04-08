@@ -75,6 +75,8 @@ textarea{resize:none;line-height:1.65;}
 .feed-quote{font-size:13px;color:var(--text-sub);font-family:'Noto Serif KR',serif;border-left:2px solid var(--purple-mid);padding-left:10px;margin-top:2px;line-height:1.6;font-style:italic;}
 .feed-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;}
 .feed-tag{padding:3px 9px;border-radius:99px;font-size:12px;background:var(--purple-light);color:var(--purple-dark);}
+.btn-delete{background:none;border:none;color:var(--text-hint);cursor:pointer;font-size:16px;line-height:1;padding:2px 4px;border-radius:4px;transition:color 0.12s;flex-shrink:0;}
+.btn-delete:hover{color:#E24B4A;}
 .empty-msg{text-align:center;padding:40px 20px;font-size:14px;color:var(--text-hint);line-height:1.7;}
 .star-input{display:flex;gap:6px;}
 .star-btn{width:32px;height:32px;border-radius:50%;border:0.5px solid var(--border-mid);background:var(--gray-50);cursor:pointer;font-size:13px;color:var(--text-sub);transition:all 0.12s;display:flex;align-items:center;justify-content:center;}
@@ -176,6 +178,14 @@ textarea{resize:none;line-height:1.65;}
   <div class="main">
     <div id="sec-quotes" class="section active">
       <div class="card" style="margin-top:12px;">
+        <div class="card-title">이번 달 읽는 책</div>
+        <div class="next-display"><span id="cur-book-val">미정</span><button class="btn-edit" onclick="toggleCurBook()">수정</button></div>
+        <div id="cur-book-edit" style="display:none;" class="edit-row">
+          <input type="text" id="cur-book-input" placeholder="이번 달 책 제목">
+          <button class="btn-save" onclick="saveCurBook()">저장</button>
+        </div>
+      </div>
+      <div class="card">
         <div class="card-title">인상적인 구절 남기기</div>
         <label class="form-label">페이지</label>
         <input type="number" id="q-page" placeholder="예: 87" min="1" class="mb10">
@@ -199,6 +209,14 @@ textarea{resize:none;line-height:1.65;}
 
     <div id="sec-thoughts" class="section">
       <div class="card" style="margin-top:12px;">
+        <div class="card-title">이번 달 읽는 책</div>
+        <div class="next-display"><span id="cur-book-val2"></span><button class="btn-edit" onclick="toggleCurBook()">수정</button></div>
+        <div id="cur-book-edit2" style="display:none;" class="edit-row">
+          <input type="text" id="cur-book-input2" placeholder="이번 달 책 제목">
+          <button class="btn-save" onclick="saveCurBook()">저장</button>
+        </div>
+      </div>
+      <div class="card">
         <div class="card-title">생각 남기기</div>
         <textarea id="t-text" rows="4" placeholder="읽으면서 떠오른 생각, 질문, 인사이트를 자유롭게..." class="mb10"></textarea>
         <hr class="divider">
@@ -367,10 +385,25 @@ function renderFeed(type){
   el.innerHTML=[...items].reverse().map(item=>{
     const mi=parseInt(item.member);
     const tags=(item.keywords||[]).map(k=>`<span class="feed-tag">${k}</span>`).join('');
-    if(type==='quotes')return `<div class="feed-item"><div class="feed-top"><div class="av ${AV_CLS[mi]}">${MEMBERS[mi][0]}</div><span class="feed-author">${MEMBERS[mi]}</span>${item.page?`<span class="feed-page">p.${item.page}</span>`:''}</div><div class="feed-quote">"${item.quote}"</div>${item.memo?`<div class="feed-text" style="margin-top:6px;">${item.memo}</div>`:''}${tags?`<div class="feed-tags">${tags}</div>`:''}</div>`;
+    const isMine=mi===currentMember;
+    const delBtn=isMine?`<button class="btn-delete" onclick="deleteItem('${type}','${item.id}')" title="삭제">×</button>`:'';
+    if(type==='quotes')return `<div class="feed-item"><div class="feed-top"><div class="av ${AV_CLS[mi]}">${MEMBERS[mi][0]}</div><span class="feed-author">${MEMBERS[mi]}</span>${item.page?`<span class="feed-page">p.${item.page}</span>`:''}<span style="margin-left:auto;">${delBtn}</span></div><div class="feed-quote">"${item.quote}"</div>${item.memo?`<div class="feed-text" style="margin-top:6px;">${item.memo}</div>`:''}${tags?`<div class="feed-tags">${tags}</div>`:''}</div>`;
     const sh=item.stars>0?`<div style="display:flex;gap:3px;margin-top:6px;">${Array.from({length:5},(_,i)=>`<div class="star ${i<item.stars?'s-on':'s-off'}"></div>`).join('')}</div>`:'';
-    return `<div class="feed-item"><div class="feed-top"><div class="av ${AV_CLS[mi]}">${MEMBERS[mi][0]}</div><span class="feed-author">${MEMBERS[mi]}</span></div><div class="feed-text">${item.text}</div>${sh}${tags?`<div class="feed-tags">${tags}</div>`:''}</div>`;
+    return `<div class="feed-item"><div class="feed-top"><div class="av ${AV_CLS[mi]}">${MEMBERS[mi][0]}</div><span class="feed-author">${MEMBERS[mi]}</span><span style="margin-left:auto;">${delBtn}</span></div><div class="feed-text">${item.text}</div>${sh}${tags?`<div class="feed-tags">${tags}</div>`:''}</div>`;
   }).join('');
+}
+
+async function deleteItem(type,id){
+  if(!confirm('이 기록을 삭제할까요?'))return;
+  showLoading('삭제 중...');
+  try{
+    await apiPost({action:'deleteItem',type,id:String(id)});
+    if(type==='quotes')cachedData.quotes=cachedData.quotes.filter(q=>String(q.id)!==String(id));
+    else cachedData.thoughts=cachedData.thoughts.filter(t=>String(t.id)!==String(id));
+    renderFeed(type);
+    showToast('삭제했어요.');
+  }catch{showToast('삭제에 실패했어요.');}
+  hideLoading();
 }
 
 async function submitQuote(){
