@@ -136,6 +136,10 @@ textarea{resize:none;line-height:1.65;}
 .star{width:11px;height:11px;border-radius:50%;}
 .s-on{background:#EF9F27;}.s-off{background:var(--gray-100);}
 
+.next-hist-item{background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius);padding:12px 15px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.next-hist-left{flex:1;}
+.next-hist-date{font-size:13px;font-weight:500;color:var(--text);margin-bottom:2px;}
+.next-hist-book{font-size:13px;color:var(--text-sub);}
 @media(max-width:380px){.two-col{grid-template-columns:1fr;}.tab-btn{font-size:11px;}}
 </style>
 </head>
@@ -263,6 +267,8 @@ textarea{resize:none;line-height:1.65;}
           </div>
         </div>
       </div>
+      <div class="card-title" style="margin:4px 0 8px;">지난 모임 기록</div>
+      <div id="next-history"></div>
     </div>
 
     <!-- 월별 보고서 탭 -->
@@ -310,7 +316,7 @@ async function startApp(){
   document.getElementById('app').style.display='block';
   renderMembers();renderStars();
   showLoading('데이터 불러오는 중...');
-  await Promise.all([loadMonthData(),loadNext(),loadMonths()]);
+  await Promise.all([loadMonthData(),loadNext(),loadMonths(),loadNextHistory()]);
   hideLoading();renderSugs();
 }
 
@@ -459,6 +465,22 @@ async function loadNext(){
     document.getElementById('nb-val').textContent=bookVal;
   }catch(e){console.error('loadNext error',e);}
 }
+async function loadNextHistory(){
+  try{
+    const items=await api({action:'getNextHistory'});
+    const el=document.getElementById('next-history');
+    if(!el)return;
+    const list=items.history||[];
+    if(!list.length){el.innerHTML='<div class="empty-msg" style="padding:20px;">아직 기록이 없어요.</div>';return;}
+    el.innerHTML=[...list].reverse().map(item=>`
+      <div class="next-hist-item">
+        <div class="next-hist-left">
+          <div class="next-hist-date">${item.date?fmtDate(item.date):'날짜 미정'}</div>
+          <div class="next-hist-book">${item.book||'책 미정'}</div>
+        </div>
+      </div>`).join('');
+  }catch(e){console.error('loadNextHistory error',e);}
+}
 
 function renderFeed(type){
   const items=type==='quotes'?(cachedData?.quotes||[]):(cachedData?.thoughts||[]);
@@ -482,8 +504,15 @@ async function deleteItem(type,id){
     await apiPost({action:'deleteItem',type,id:String(id)});
     if(type==='quotes')cachedData.quotes=cachedData.quotes.filter(q=>String(q.id)!==String(id));
     else cachedData.thoughts=cachedData.thoughts.filter(t=>String(t.id)!==String(id));
+    // 해당 달 기록이 모두 없으면 months에서 제거
+    const mk=monthKey();
+    const total=(cachedData.quotes||[]).length+(cachedData.thoughts||[]).length;
+    if(total===0){
+      await apiPost({action:'deleteMonth',month:mk});
+      allMonths=allMonths.filter(m=>m!==mk);
+    }
     renderFeed(type);showToast('삭제했어요.');
-  }catch{showToast('삭제에 실패했어요.');}
+  }catch(e){console.error(e);showToast('삭제에 실패했어요.');}
   hideLoading();
 }
 
