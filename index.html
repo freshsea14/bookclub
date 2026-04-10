@@ -140,6 +140,24 @@ textarea{resize:none;line-height:1.65;}
 .next-hist-left{flex:1;}
 .next-hist-date{font-size:13px;font-weight:500;color:var(--text);margin-bottom:2px;}
 .next-hist-book{font-size:13px;color:var(--text-sub);}
+.tl-wrap{position:relative;padding-left:22px;}
+.tl-wrap::before{content:'';position:absolute;left:6px;top:0;bottom:0;width:1px;background:var(--border);}
+.tl-item{position:relative;margin-bottom:10px;}
+.tl-dot{position:absolute;left:-19px;top:14px;width:10px;height:10px;border-radius:50%;border:2px solid var(--bg);}
+.dot-done{background:var(--purple);}
+.dot-next{background:var(--teal);}
+.tl-card{background:var(--card);border:0.5px solid var(--border);border-radius:var(--radius);padding:11px 14px;}
+.tl-card.is-next{border-color:#5DCAA5;border-width:1.5px;background:#E1F5EE;}
+.tl-badge{display:inline-flex;align-items:center;font-size:11px;font-weight:500;padding:2px 8px;border-radius:99px;margin-bottom:5px;}
+.badge-done{background:var(--purple-light);color:var(--purple-dark);}
+.badge-next{background:var(--teal-light);color:var(--teal-dark);}
+.tl-date{font-size:12px;color:var(--text-sub);margin-bottom:2px;}
+.tl-book{font-size:14px;font-weight:500;color:var(--text);}
+.tl-book.is-next{color:var(--teal-dark);}
+.pager{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:10px;}
+.pager-btn{padding:6px 14px;font-size:13px;font-family:'Noto Sans KR',sans-serif;border:0.5px solid var(--border-mid);border-radius:var(--radius-sm);background:transparent;color:var(--text-sub);cursor:pointer;}
+.pager-btn:disabled{opacity:0.3;cursor:not-allowed;}
+.pager-info{font-size:13px;color:var(--text-sub);}
 @media(max-width:380px){.two-col{grid-template-columns:1fr;}.tab-btn{font-size:11px;}}
 </style>
 </head>
@@ -249,28 +267,31 @@ textarea{resize:none;line-height:1.65;}
     <!-- 다음 모임 탭 -->
     <div id="sec-next" class="section">
       <div class="card" style="margin-top:12px;">
-        <div class="card-title">다음 모임 입력</div>
+        <div class="card-title">모임 기록 입력</div>
         <label class="form-label">날짜</label>
         <input type="date" id="nd-input" class="mb10">
-        <label class="form-label">다음 읽을 책</label>
+        <label class="form-label">읽은 책 (또는 다음 읽을 책)</label>
         <input type="text" id="nb-input" placeholder="책 제목을 입력해요" class="mb10">
+        <div style="display:flex;gap:8px;margin-bottom:6px;">
+          <button class="btn-sm" id="type-done" onclick="setMeetType('done')" style="flex:1;background:var(--purple-light);color:var(--purple-dark);border-color:var(--purple-mid);">완료된 모임</button>
+          <button class="btn-sm" id="type-next" onclick="setMeetType('next')" style="flex:1;">다음 모임 예고</button>
+        </div>
         <button class="btn-submit" onclick="saveNextAll()">저장하기</button>
       </div>
-      <div class="card" style="margin-top:4px;" id="next-current-card">
-        <div class="card-title">현재 다음 모임</div>
+      <div class="card" style="margin-top:4px;">
+        <div class="card-title">다음 모임</div>
         <div style="display:flex;gap:16px;">
-          <div>
-            <div class="form-label">날짜</div>
-            <div style="font-size:15px;font-weight:500;color:var(--text);margin-top:3px;" id="nd-val">미정</div>
-          </div>
-          <div>
-            <div class="form-label">다음 읽을 책</div>
-            <div style="font-size:15px;font-weight:500;color:var(--text);margin-top:3px;" id="nb-val">미정</div>
-          </div>
+          <div><div class="form-label">날짜</div><div style="font-size:15px;font-weight:500;color:var(--text);margin-top:3px;" id="nd-val">미정</div></div>
+          <div><div class="form-label">책</div><div style="font-size:15px;font-weight:500;color:var(--text);margin-top:3px;" id="nb-val">미정</div></div>
         </div>
       </div>
-      <div class="card-title" style="margin:4px 0 8px;">지난 모임 기록</div>
+      <div class="card-title" style="margin:8px 0 8px;">모임 흐름</div>
       <div id="next-history"></div>
+      <div class="pager" id="next-pager" style="display:none;">
+        <button class="pager-btn" id="pager-prev" onclick="histPage(-1)">← 이전</button>
+        <span class="pager-info" id="pager-info"></span>
+        <button class="pager-btn" id="pager-next" onclick="histPage(1)">다음 →</button>
+      </div>
     </div>
 
     <!-- 월별 보고서 탭 -->
@@ -588,26 +609,52 @@ async function submitThought(){
   btn.disabled=false;hideLoading();
 }
 
+let meetType='done';
+let historyPage=0;
+const HIST_PER_PAGE=4;
+
+function setMeetType(t){
+  meetType=t;
+  const doneBtn=document.getElementById('type-done');
+  const nextBtn=document.getElementById('type-next');
+  if(!doneBtn||!nextBtn)return;
+  if(t==='done'){
+    doneBtn.style.background='var(--purple-light)';doneBtn.style.color='var(--purple-dark)';doneBtn.style.borderColor='var(--purple-mid)';
+    nextBtn.style.background='transparent';nextBtn.style.color='var(--text-sub)';nextBtn.style.borderColor='var(--border-mid)';
+  } else {
+    nextBtn.style.background='var(--teal-light)';nextBtn.style.color='var(--teal-dark)';nextBtn.style.borderColor='#5DCAA5';
+    doneBtn.style.background='transparent';doneBtn.style.color='var(--text-sub)';doneBtn.style.borderColor='var(--border-mid)';
+  }
+}
+
 async function saveNextAll(){
   const date=document.getElementById('nd-input').value;
   const book=document.getElementById('nb-input').value.trim();
   if(!date&&!book){showToast('날짜 또는 책 제목을 입력해주세요.');return;}
   showLoading('저장 중...');
   try{
-    const data={};
+    const data={type:meetType};
     if(date)data.date=date;
     if(book)data.book=book;
-    await apiPost({action:'saveNext',data});
-    // 화면 즉시 반영
-    if(date)document.getElementById('nd-val').textContent=fmtDate(date);
-    if(book)document.getElementById('nb-val').textContent=book;
-    // 입력창 초기화
+    // 다음 모임 예고면 next 시트도 업데이트
+    if(meetType==='next'){
+      await apiPost({action:'saveNext',data:{date:date||'',book:book||''}});
+      if(date)document.getElementById('nd-val').textContent=fmtDate(date);
+      if(book)document.getElementById('nb-val').textContent=book;
+    }
+    await apiPost({action:'saveHistory',data});
     document.getElementById('nd-input').value='';
     document.getElementById('nb-input').value='';
+    historyPage=0;
     await loadNextHistory();
     showToast('저장했어요!');
   }catch(e){console.error(e);showToast('저장 실패: '+e.message);}
   hideLoading();
+}
+
+function histPage(dir){
+  historyPage+=dir;
+  renderHistoryPage();
 }
 
 async function renderReport(){
