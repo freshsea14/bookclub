@@ -249,21 +249,23 @@ textarea{resize:none;line-height:1.65;}
     <!-- 다음 모임 탭 -->
     <div id="sec-next" class="section">
       <div class="card" style="margin-top:12px;">
-        <div class="card-title">다음 모임 정보</div>
-        <div class="next-field">
-          <label class="form-label">날짜</label>
-          <div class="next-display"><span id="nd-val">미정</span><button class="btn-edit" onclick="toggleEdit('date')">수정</button></div>
-          <div id="nd-edit" style="display:none;" class="edit-row">
-            <input type="date" id="nd-input">
-            <button class="btn-save" onclick="saveNext('date')">저장</button>
+        <div class="card-title">다음 모임 입력</div>
+        <label class="form-label">날짜</label>
+        <input type="date" id="nd-input" class="mb10">
+        <label class="form-label">다음 읽을 책</label>
+        <input type="text" id="nb-input" placeholder="책 제목을 입력해요" class="mb10">
+        <button class="btn-submit" onclick="saveNextAll()">저장하기</button>
+      </div>
+      <div class="card" style="margin-top:4px;" id="next-current-card">
+        <div class="card-title">현재 다음 모임</div>
+        <div style="display:flex;gap:16px;">
+          <div>
+            <div class="form-label">날짜</div>
+            <div style="font-size:15px;font-weight:500;color:var(--text);margin-top:3px;" id="nd-val">미정</div>
           </div>
-        </div>
-        <div class="next-field" style="margin-bottom:0;">
-          <label class="form-label">다음 읽을 책</label>
-          <div class="next-display"><span id="nb-val">미정</span><button class="btn-edit" onclick="toggleEdit('book')">수정</button></div>
-          <div id="nb-edit" style="display:none;" class="edit-row">
-            <input type="text" id="nb-input" placeholder="책 제목을 입력해요">
-            <button class="btn-save" onclick="saveNext('book')">저장</button>
+          <div>
+            <div class="form-label">다음 읽을 책</div>
+            <div style="font-size:15px;font-weight:500;color:var(--text);margin-top:3px;" id="nb-val">미정</div>
           </div>
         </div>
       </div>
@@ -476,6 +478,12 @@ async function loadNext(){
     document.getElementById('nb-val').textContent=bookVal;
   }catch(e){console.error('loadNext error',e);}
 }
+// 다음 모임 히스토리에서 수정
+async function editHistory(date,book){
+  document.getElementById('nd-input').value=date||'';
+  document.getElementById('nb-input').value=book||'';
+  showToast('수정할 내용을 위에서 변경 후 저장해주세요.');
+}
 async function loadNextHistory(){
   try{
     const items=await api({action:'getNextHistory'});
@@ -489,6 +497,7 @@ async function loadNextHistory(){
           <div class="next-hist-date">${item.date?fmtDate(item.date):'날짜 미정'}</div>
           <div class="next-hist-book">${item.book||'책 미정'}</div>
         </div>
+        <button class="btn-edit" onclick="editHistory('${item.date||''}','${(item.book||'').replace(/'/g,'\\&#39;')}')">수정</button>
       </div>`).join('');
   }catch(e){console.error('loadNextHistory error',e);}
 }
@@ -579,23 +588,23 @@ async function submitThought(){
   btn.disabled=false;hideLoading();
 }
 
-// 6번: 장소 제거 — date, book만
-function toggleEdit(f){
-  const ids={date:'nd',book:'nb'};const id=ids[f];
-  const edit=document.getElementById(`${id}-edit`);const isOpen=edit.style.display!=='none';
-  edit.style.display=isOpen?'none':'flex';
-  if(!isOpen&&f==='book')document.getElementById('nb-input').value=document.getElementById('nb-val').textContent==='미정'?'':document.getElementById('nb-val').textContent;
-}
-async function saveNext(f){
-  const ids={date:'nd',book:'nb'};const id=ids[f];
+async function saveNextAll(){
+  const date=document.getElementById('nd-input').value;
+  const book=document.getElementById('nb-input').value.trim();
+  if(!date&&!book){showToast('날짜 또는 책 제목을 입력해주세요.');return;}
   showLoading('저장 중...');
   try{
     const data={};
-    if(f==='date')data.date=document.getElementById('nd-input').value;
-    if(f==='book')data.book=document.getElementById('nb-input').value.trim();
+    if(date)data.date=date;
+    if(book)data.book=book;
     await apiPost({action:'saveNext',data});
-    await loadNext();
-    document.getElementById(`${id}-edit`).style.display='none';
+    // 화면 즉시 반영
+    if(date)document.getElementById('nd-val').textContent=fmtDate(date);
+    if(book)document.getElementById('nb-val').textContent=book;
+    // 입력창 초기화
+    document.getElementById('nd-input').value='';
+    document.getElementById('nb-input').value='';
+    await loadNextHistory();
     showToast('저장했어요!');
   }catch(e){console.error(e);showToast('저장 실패: '+e.message);}
   hideLoading();
@@ -620,42 +629,55 @@ async function renderReport(){
     allMonths.forEach(async(m,i)=>{
       try{const r=await api({action:'getAll',month:m});const el=document.getElementById(`st-${i}`);if(el)el.textContent=r.book||'(미입력)';}catch{}
     });
-    renderRptBody(mk,SPINE_COLORS[rptIdx%SPINE_COLORS.length],res);
+    // 다음 모임 정보도 함께 불러오기
+    let nextInfo={};
+    try{nextInfo=await api({action:'getNext'});}catch{}
+    renderRptBody(mk,SPINE_COLORS[rptIdx%SPINE_COLORS.length],res,nextInfo);
   }catch{hideLoading();body.innerHTML=`<div class="empty-msg">보고서를 불러오지 못했어요.</div>`;}
 }
 
-function renderRptBody(mk,color,data){
+function renderRptBody(mk,color,data,nextInfo){
   const quotes=data.quotes||[];const thoughts=data.thoughts||[];const bookTitle=data.book||'';
   const all=[...quotes,...thoughts];const kwCnt={};
   all.forEach(item=>(item.keywords||[]).forEach(kw=>{kwCnt[kw]=(kwCnt[kw]||0)+1;}));
   const kwSorted=Object.entries(kwCnt).sort((a,b)=>b[1]-a[1]);const maxKw=kwSorted[0]?.[1]||1;
-  const rbm={};thoughts.forEach(t=>{if(t.stars>0)rbm[t.member]=t.stars;});
+  const rbm={};thoughts.forEach(t=>{if(Number(t.stars)>0)rbm[t.member]=Number(t.stars);});
   const ratings=Object.values(rbm);const avg=ratings.length?(ratings.reduce((s,r)=>s+r,0)/ratings.length).toFixed(1):null;
+  // 멤버별 기록 수
+  const memberCnt={};
+  all.forEach(item=>{const mi=String(item.member);memberCnt[mi]=(memberCnt[mi]||0)+1;});
 
   document.getElementById('report-body').innerHTML=`
     <div class="book-banner"><div class="rpt-spine" style="background:${color}"></div><div style="flex:1;">
       <div style="display:flex;align-items:center;gap:8px;">
         <div class="rpt-book-title" id="rpt-book-title-display" style="${bookTitle?'':'color:var(--text-hint);font-size:14px;font-weight:400;'}">${bookTitle||'책 제목을 입력해주세요'}</div>
-        <button class="btn-edit" onclick="toggleRptBookEdit('${mk}')" id="rpt-book-edit-btn">수정</button>
+        <button class="btn-edit" onclick="toggleRptBookEdit('${mk}')">수정</button>
       </div>
-      <div id="rpt-book-edit-row" style="display:none;" class="edit-row" style="margin-top:6px;">
+      <div id="rpt-book-edit-row" style="display:none;margin-top:6px;" class="edit-row">
         <input type="text" id="rpt-book-input" placeholder="책 제목 입력" value="${bookTitle}">
         <button class="btn-save" onclick="saveRptBook('${mk}')">저장</button>
       </div>
       <div class="rpt-book-date">${monthLabel(mk)}</div>
       ${avg?`<div class="avg-badge">★ 평균 ${avg}</div>`:''}
     </div></div>
+
     <div class="stats-row">
       <div class="sc"><div class="sc-label">총 기록</div><div class="sc-val">${all.length}</div></div>
       <div class="sc"><div class="sc-label">인상 문장</div><div class="sc-val">${quotes.length}</div></div>
       <div class="sc"><div class="sc-label">키워드</div><div class="sc-val">${kwSorted.length}</div></div>
     </div>
+
     ${kwSorted.length?`<div class="kw-cloud"><div class="card-title" style="margin-bottom:10px;">이달의 키워드</div><div class="kw-wrap">${kwSorted.map(([w,c])=>{const cls=c>=maxKw?'kw3':c>=maxKw-1&&maxKw>1?'kw2':'kw1';return `<span class="kw ${cls}">${w}</span>`;}).join('')}</div><div class="kw-hint">크기 = 여럿이 함께 입력한 횟수</div></div>`:''}
-    <div class="two-col">
-      <div class="panel"><div class="panel-ttl">인상적인 문장</div>${quotes.length?quotes.slice(0,3).map(q=>`<div class="rq">${q.quote?`<div class="rq-text">"${q.quote}"</div>`:''}${q.memo?`<div style="font-size:12px;color:var(--text-sub);margin-top:3px;">${q.memo}</div>`:''}<div class="rq-meta">${MEMBERS[parseInt(q.member)]}${q.page?` · p.${q.page}`:''}</div></div>`).join(''):'<div style="font-size:13px;color:var(--text-hint);">없음</div>'}</div>
-      <div class="panel"><div class="panel-ttl">기억에 남는 생각</div>${thoughts.length?thoughts.slice(0,3).map(t=>`<div class="rt"><div class="rt-top"><div class="av ${AV_CLS[parseInt(t.member)]}" style="width:20px;height:20px;font-size:10px;">${MEMBERS[parseInt(t.member)][0]}</div><span class="rt-name">${MEMBERS[parseInt(t.member)]}</span></div>${t.text?`<div class="rt-text">${t.text}</div>`:''}</div>`).join(''):'<div style="font-size:13px;color:var(--text-hint);">없음</div>'}</div>
-    </div>
-    ${Object.keys(rbm).length?`<div class="rating-card"><div class="card-title" style="margin-bottom:10px;">각자의 별점</div>${MEMBERS.map((name,i)=>{const s=rbm[i];if(!s)return'';return `<div class="rating-row"><div class="av ${AV_CLS[i]}" style="width:24px;height:24px;font-size:11px;">${name[0]}</div><span class="r-name">${name}</span><div class="stars">${Array.from({length:5},(_,si)=>`<div class="star ${si<s?'s-on':'s-off'}"></div>`).join('')}</div></div>`;}).join('')}</div>`:''}
+
+    ${Object.keys(rbm).length?`<div class="rating-card"><div class="card-title" style="margin-bottom:10px;">각자의 별점</div>${MEMBERS.map((name,i)=>{const s=rbm[i];if(!s)return'';const stars=Array.from({length:5},(_,si)=>`<div class="star ${si<s?'s-on':'s-off'}"></div>`).join('');return `<div class="rating-row"><div class="av ${AV_CLS[i]}" style="width:24px;height:24px;font-size:11px;">${name[0]}</div><span class="r-name">${name}</span><div class="stars">${stars}</div></div>`;}).join('')}</div>`:''}
+
+    ${nextInfo&&(nextInfo.date||nextInfo.book)?`<div class="card" style="margin-bottom:10px;background:var(--purple-light);border-color:var(--purple-mid);">
+      <div class="card-title" style="color:var(--purple-dark);">다음 모임 예고</div>
+      <div style="display:flex;gap:20px;">
+        ${nextInfo.date?`<div><div class="form-label">날짜</div><div style="font-size:14px;font-weight:500;color:var(--purple-dark);margin-top:3px;">${fmtDate(nextInfo.date)}</div></div>`:''}
+        ${nextInfo.book?`<div><div class="form-label">다음 책</div><div style="font-size:14px;font-weight:500;color:var(--purple-dark);margin-top:3px;">${nextInfo.book}</div></div>`:''}
+      </div>
+    </div>`:''}
   `;
 }
 
