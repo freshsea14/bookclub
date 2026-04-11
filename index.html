@@ -288,7 +288,7 @@ const MEMBERS=['계희','미선','나형'];
 const AVC=['av0','av1','av2'];
 const COLORS=['#7F77DD','#1D9E75','#D85A30','#378ADD','#BA7517','#D4537E','#534AB7','#0F6E56'];
 // ★ 새 Apps Script URL로 교체해주세요
-const URL='https://script.google.com/macros/s/AKfycbzVzpbkwLHqNCV9-Eu-ci1fGcgTPO9II2598GlsL7DY4hezZXFOK3sv5mGjG0gRX8pPTA/exec';
+const SURL='https://script.google.com/macros/s/AKfycbzVzpbkwLHqNCV9-Eu-ci1fGcgTPO9II2598GlsL7DY4hezZXFOK3sv5mGjG0gRX8pPTA/exec';
 
 let cm=parseInt(localStorage.getItem('bcM')||'0');
 let tags={q:[],t:[]};
@@ -316,7 +316,7 @@ function jp(params){
   return new Promise((res,rej)=>{
     const cb='_cb'+Date.now()+'_'+Math.random().toString(36).slice(2);
     params.callback=cb;
-    const u=URL+'?'+new URLSearchParams(params);
+    const u=SURL+'?'+new URLSearchParams(params);
     const s=document.createElement('script');s.type='text/javascript';
     const t=setTimeout(()=>{cl();rej(new Error('시간 초과'));},15000);
     function cl(){clearTimeout(t);if(window[cb])delete window[cb];if(s.parentNode)s.parentNode.removeChild(s);}
