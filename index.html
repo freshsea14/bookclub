@@ -395,7 +395,7 @@ async function addBook(p){
   showL('책 추가 중...');
   try{
     await post({action:'addBook',title:v});
-    books.push(v);
+    books.unshift(v);
     selBook[p]=v;
     renderChips('q');renderChips('t');
     inp.value='';
