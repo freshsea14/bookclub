@@ -375,7 +375,7 @@ function selB(p,b){
 async function loadBookData(p){
   if(!selBook[p])return;
   try{
-    const r=await api({action:'getAll',book:encodeURIComponent(selBook[p])});
+    const r=await api({action:'getAll',book:selBook[p]});
     const qs=(r.quotes||[]).map(q=>{if(!Array.isArray(q.keywords))q.keywords=q.keywords?String(q.keywords).split(',').filter(Boolean):[];return q;});
     const ts=(r.thoughts||[]).map(t=>{if(!Array.isArray(t.keywords))t.keywords=t.keywords?String(t.keywords).split(',').filter(Boolean):[];t.stars=Number(t.stars)||0;return t;});
     if(p==='q')cache.q=qs;
@@ -672,7 +672,7 @@ async function renderShelf(){
     </div>`).join('');
   showL('책 기록 불러오는 중...');
   try{
-    const r=await api({action:'getAll',book:encodeURIComponent(book)});
+    const r=await api({action:'getAll',book:book});
     hideL();
     const qs=(r.quotes||[]).map(q=>{if(!Array.isArray(q.keywords))q.keywords=q.keywords?String(q.keywords).split(',').filter(Boolean):[];return q;});
     const ts=(r.thoughts||[]).map(t=>{if(!Array.isArray(t.keywords))t.keywords=t.keywords?String(t.keywords).split(',').filter(Boolean):[];t.stars=Number(t.stars)||0;return t;});
