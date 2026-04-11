@@ -361,7 +361,7 @@ function showTab(tab){
 
 // 책 목록
 async function loadBooks(){
-  try{const r=await api({action:'getBooks'});books=r.books||[];renderChips('q');renderChips('t');}
+  try{const r=await api({action:'getBooks'});books=(r.books||[]).reverse();renderChips('q');renderChips('t');}
   catch(e){console.error('loadBooks',e);}
 }
 function renderChips(p){
