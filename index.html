@@ -334,8 +334,12 @@ function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t
 function fmtD(d){
   if(!d||d==='미정'||!String(d).trim())return'미정';
   const s=String(d).trim();
+  // yyyy-mm-dd 형식
   const m=s.match(/(\d{4})[-./](\d{1,2})[-./](\d{1,2})/);
   if(m)return `${m[1]}년 ${parseInt(m[2])}월 ${parseInt(m[3])}일`;
+  // Date 문자열 형식 (Fri May 22 2026...)
+  const dt=new Date(s);
+  if(!isNaN(dt.getTime()))return `${dt.getFullYear()}년 ${dt.getMonth()+1}월 ${dt.getDate()}일`;
   return s;
 }
 
