@@ -623,22 +623,8 @@ function renderHistPage(){
   }
 }
 
-function startHistEdit(id){editingHistId=String(id);renderHistPage();}
-function cancelHistEdit(){editingHistId=null;renderHistPage();}
-function setHType(id,t){
-  const d=document.getElementById(`he-done-${id}`);
-  const n=document.getElementById(`he-next-${id}`);
-  if(!d||!n)return;
-  if(t==='done'){
-    d.style.cssText='flex:1;background:var(--pl);color:var(--pd);border-color:var(--pm);';
-    n.style.cssText='flex:1;background:transparent;color:var(--ts);border-color:var(--bm);';
-  }else{
-    n.style.cssText='flex:1;background:var(--tl);color:var(--td);border-color:#5DCAA5;';
-    d.style.cssText='flex:1;background:transparent;color:var(--ts);border-color:var(--bm);';
-  }
-  const item=histAll.find(h=>String(h.id)===String(id));
-  if(item)item._editType=t;
-}
+
+
 let editType='done';
 function hedit(id){editingHistId=id;renderHistPage();}
 function hcancel(){editingHistId=null;renderHistPage();}
