@@ -577,44 +577,42 @@ function renderHistPage(){
   if(hpage>=totalP)hpage=totalP-1;
   const page=histAll.slice(hpage*HPP,(hpage+1)*HPP);
 
-  // 현재 편집 타입 저장용
-  window._histEditTypes = window._histEditTypes || {};
-
   let html = '<div class="tlw">';
   page.forEach(function(item){
     const isN = item.type==='next';
-    const isEditing = String(editingHistId)===String(item.id);
     const sid = String(item.id);
-    if(!window._histEditTypes[sid]) window._histEditTypes[sid] = item.type;
-
-    html += '<div class="tli" id="hi-'+sid+'">';
+    html += '<div class="tli">';
     html += '<div class="tld '+(isN?'dn':'dd')+'"></div>';
     html += '<div class="tlc '+(isN?'isnext':'')+'">';
     html += '<div class="tlbadge '+(isN?'bnext':'bdone')+'">'+(isN?'다음 모임':'완료된 모임')+'</div>';
-
-    if(isEditing){
-      html += '<div class="tl-edit-row">';
-      html += '<input type="date" id="ed-date-'+sid+'" value="'+(item.date||'')+'">';
-      html += '<input type="text" id="ed-book-'+sid+'" placeholder="책 제목" value="'+(item.book||'')+'">';
-      html += '<div style="display:flex;gap:6px;margin-bottom:4px;">';
-      html += '<button class="bsm" id="ed-done-'+sid+'" style="flex:1;'+(item.type!=='next'?'background:var(--pl);color:var(--pd);border-color:var(--pm);':'')+'" onclick="hdone(this.dataset.id)" data-id="'+sid+'">완료된 모임</button>';
-      html += '<button class="bsm" id="ed-next-'+sid+'" style="flex:1;'+(item.type==='next'?'background:var(--tl);color:var(--td);border-color:#5DCAA5;':'')+'" onclick="hnext(this.dataset.id)" data-id="'+sid+'">다음 모임 예고</button>';
-      html += '</div>';
-      html += '<div class="tl-edit-btns">';
-      html += '<button class="bsv" style="flex:1;" onclick="hsave(this.dataset.id)" data-id="'+sid+'">저장</button>';
-      html += '<button class="bsm" style="flex:1;" onclick="hcancel()">취소</button>';
-      html += '</div></div>';
-    } else {
-      html += '<div class="tldate">'+(item.date?fmtD(item.date):'날짜 미정')+'</div>';
-      html += '<div class="tlbook '+(isN?'isnext':'')+'">'+(item.book||'책 미정')+'</div>';
-      html += '<div class="tl-actions">';
-      html += '<button class="tl-btn" onclick="hedit(this.dataset.id)" data-id="'+sid+'">수정</button>';
-      html += '<button class="tl-btn del" onclick="hdel(this.dataset.id)" data-id="'+sid+'">삭제</button>';
-      html += '</div>';
-    }
-    html += '</div></div>';
+    html += '<div class="tldate">'+(item.date?fmtD(item.date):'날짜 미정')+'</div>';
+    html += '<div class="tlbook '+(isN?'isnext':'')+'">'+(item.book||'책 미정')+'</div>';
+    html += '<div class="tl-actions">';
+    html += '<button class="tl-btn" onclick="hedit(this.dataset.id)" data-id="'+sid+'">수정</button>';
+    html += '<button class="tl-btn del" onclick="hdel(this.dataset.id)" data-id="'+sid+'">삭제</button>';
+    html += '</div></div></div>';
   });
   html += '</div>';
+  // 편집 카드 — 별도로 렌더
+  if(editingHistId){
+    const editItem = histAll.find(function(h){return String(h.id)===String(editingHistId);});
+    if(editItem){
+      html += '<div class="card" id="hist-edit-card" style="margin-top:10px;">';
+      html += '<div class="ct">기록 수정</div>';
+      html += '<label class="fl">날짜</label>';
+      html += '<input type="date" id="ed-date" value="'+(editItem.date||'')+'" style="margin-bottom:10px;">';
+      html += '<label class="fl">책 제목</label>';
+      html += '<input type="text" id="ed-book" value="'+(editItem.book||'')+'" placeholder="책 제목" style="margin-bottom:10px;">';
+      html += '<div style="display:flex;gap:8px;margin-bottom:8px;">';
+      html += '<button class="bsm" id="ed-tp-done" onclick="hedtDone()" style="flex:1;'+(editItem.type!=='next'?'background:var(--pl);color:var(--pd);border-color:var(--pm);':'')+'" >완료된 모임</button>';
+      html += '<button class="bsm" id="ed-tp-next" onclick="hedtNext()" style="flex:1;'+(editItem.type==='next'?'background:var(--tl);color:var(--td);border-color:#5DCAA5;':'')+'" >다음 모임 예고</button>';
+      html += '</div>';
+      html += '<div style="display:flex;gap:8px;">';
+      html += '<button class="bsv" onclick="hsave()" style="flex:1;">저장</button>';
+      html += '<button class="bsm" onclick="hcancel()" style="flex:1;">취소</button>';
+      html += '</div></div>';
+    }
+  }
   el.innerHTML = html;
 
   if(pgr){
@@ -641,28 +639,30 @@ function setHType(id,t){
   const item=histAll.find(h=>String(h.id)===String(id));
   if(item)item._editType=t;
 }
+let editType='done';
 function hedit(id){editingHistId=id;renderHistPage();}
 function hcancel(){editingHistId=null;renderHistPage();}
-function hdone(id){
-  window._histEditTypes[id]='done';
-  var d=document.getElementById('ed-done-'+id);
-  var n=document.getElementById('ed-next-'+id);
+function hedtDone(){
+  editType='done';
+  var d=document.getElementById('ed-tp-done');
+  var n=document.getElementById('ed-tp-next');
   if(d)d.style.cssText='flex:1;background:var(--pl);color:var(--pd);border-color:var(--pm);';
   if(n)n.style.cssText='flex:1;background:transparent;color:var(--ts);border-color:var(--bm);';
 }
-function hnext(id){
-  window._histEditTypes[id]='next';
-  var d=document.getElementById('ed-done-'+id);
-  var n=document.getElementById('ed-next-'+id);
+function hedtNext(){
+  editType='next';
+  var d=document.getElementById('ed-tp-done');
+  var n=document.getElementById('ed-tp-next');
   if(n)n.style.cssText='flex:1;background:var(--tl);color:var(--td);border-color:#5DCAA5;';
   if(d)d.style.cssText='flex:1;background:transparent;color:var(--ts);border-color:var(--bm);';
 }
-function hsave(id){
-  var dateEl=document.getElementById('ed-date-'+id);
-  var bookEl=document.getElementById('ed-book-'+id);
+function hsave(){
+  var dateEl=document.getElementById('ed-date');
+  var bookEl=document.getElementById('ed-book');
   if(!dateEl||!bookEl){toast('오류: 입력창 없음');return;}
-  var type=window._histEditTypes[id]||'done';
-  doSaveHistEdit(id,dateEl.value,bookEl.value.trim(),type);
+  var item=histAll.find(function(h){return String(h.id)===String(editingHistId);});
+  var type=editType||(item?item.type:'done');
+  doSaveHistEdit(editingHistId,dateEl.value,bookEl.value.trim(),type);
 }
 function hdel(id){delHist(id);}
 
