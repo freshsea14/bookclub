@@ -577,72 +577,45 @@ function renderHistPage(){
   if(hpage>=totalP)hpage=totalP-1;
   const page=histAll.slice(hpage*HPP,(hpage+1)*HPP);
 
-  const tlWrap = document.createElement('div');
-  tlWrap.className = 'tlw';
+  // 현재 편집 타입 저장용
+  window._histEditTypes = window._histEditTypes || {};
+
+  let html = '<div class="tlw">';
   page.forEach(function(item){
     const isN = item.type==='next';
     const isEditing = String(editingHistId)===String(item.id);
-    const div = document.createElement('div');
-    div.className = 'tli';
-    div.id = 'hi-'+item.id;
+    const sid = String(item.id);
+    if(!window._histEditTypes[sid]) window._histEditTypes[sid] = item.type;
+
+    html += '<div class="tli" id="hi-'+sid+'">';
+    html += '<div class="tld '+(isN?'dn':'dd')+'"></div>';
+    html += '<div class="tlc '+(isN?'isnext':'')+'">';
+    html += '<div class="tlbadge '+(isN?'bnext':'bdone')+'">'+(isN?'다음 모임':'완료된 모임')+'</div>';
 
     if(isEditing){
-      div.innerHTML = '<div class="tld '+(isN?'dn':'dd')+'"></div>'
-        +'<div class="tlc '+(isN?'isnext':'')+'">'
-        +'<div class="tlbadge '+(isN?'bnext':'bdone')+'">'+(isN?'다음 모임':'완료된 모임')+'</div>'
-        +'<div class="tl-edit-row">'
-        +'<input type="date" class="edit-date" value="'+(item.date||'')+'">'
-        +'<input type="text" class="edit-book" placeholder="책 제목" value="'+(item.book||'')+'">'
-        +'<div style="display:flex;gap:6px;margin-bottom:4px;">'
-        +'<button class="bsm btn-done" style="flex:1;'+(item.type!=='next'?'background:var(--pl);color:var(--pd);border-color:var(--pm);':'')+'">완료된 모임</button>'
-        +'<button class="bsm btn-next" style="flex:1;'+(item.type==='next'?'background:var(--tl);color:var(--td);border-color:#5DCAA5;':'')+'">다음 모임 예고</button>'
-        +'</div>'
-        +'<div class="tl-edit-btns">'
-        +'<button class="bsv btn-save" style="flex:1;">저장</button>'
-        +'<button class="bsm btn-cancel" style="flex:1;">취소</button>'
-        +'</div></div></div>';
-
-      let curType = item.type;
-      div.querySelector('.btn-done').addEventListener('click', function(){
-        curType='done';
-        div.querySelector('.btn-done').style.cssText='flex:1;background:var(--pl);color:var(--pd);border-color:var(--pm);';
-        div.querySelector('.btn-next').style.cssText='flex:1;background:transparent;color:var(--ts);border-color:var(--bm);';
-      });
-      div.querySelector('.btn-next').addEventListener('click', function(){
-        curType='next';
-        div.querySelector('.btn-next').style.cssText='flex:1;background:var(--tl);color:var(--td);border-color:#5DCAA5;';
-        div.querySelector('.btn-done').style.cssText='flex:1;background:transparent;color:var(--ts);border-color:var(--bm);';
-      });
-      div.querySelector('.btn-save').addEventListener('click', function(){
-        const date=div.querySelector('.edit-date').value;
-        const book=div.querySelector('.edit-book').value.trim();
-        doSaveHistEdit(item.id, date, book, curType);
-      });
-      div.querySelector('.btn-cancel').addEventListener('click', function(){
-        editingHistId=null;renderHistPage();
-      });
+      html += '<div class="tl-edit-row">';
+      html += '<input type="date" id="ed-date-'+sid+'" value="'+(item.date||'')+'">';
+      html += '<input type="text" id="ed-book-'+sid+'" placeholder="책 제목" value="'+(item.book||'')+'">';
+      html += '<div style="display:flex;gap:6px;margin-bottom:4px;">';
+      html += '<button class="bsm" id="ed-done-'+sid+'" style="flex:1;'+(item.type!=='next'?'background:var(--pl);color:var(--pd);border-color:var(--pm);':'')+'" onclick="hdone(this.dataset.id)" data-id="'+sid+'">완료된 모임</button>';
+      html += '<button class="bsm" id="ed-next-'+sid+'" style="flex:1;'+(item.type==='next'?'background:var(--tl);color:var(--td);border-color:#5DCAA5;':'')+'" onclick="hnext(this.dataset.id)" data-id="'+sid+'">다음 모임 예고</button>';
+      html += '</div>';
+      html += '<div class="tl-edit-btns">';
+      html += '<button class="bsv" style="flex:1;" onclick="hsave(this.dataset.id)" data-id="'+sid+'">저장</button>';
+      html += '<button class="bsm" style="flex:1;" onclick="hcancel()">취소</button>';
+      html += '</div></div>';
     } else {
-      div.innerHTML = '<div class="tld '+(isN?'dn':'dd')+'"></div>'
-        +'<div class="tlc '+(isN?'isnext':'')+'">'
-        +'<div class="tlbadge '+(isN?'bnext':'bdone')+'">'+(isN?'다음 모임':'완료된 모임')+'</div>'
-        +'<div class="tldate">'+(item.date?fmtD(item.date):'날짜 미정')+'</div>'
-        +'<div class="tlbook '+(isN?'isnext':'')+'">'+(item.book||'책 미정')+'</div>'
-        +'<div class="tl-actions">'
-        +'<button class="tl-btn btn-edit">수정</button>'
-        +'<button class="tl-btn del btn-del">삭제</button>'
-        +'</div></div>';
-
-      div.querySelector('.btn-edit').addEventListener('click', function(){
-        editingHistId=String(item.id);renderHistPage();
-      });
-      div.querySelector('.btn-del').addEventListener('click', function(){
-        delHist(String(item.id));
-      });
+      html += '<div class="tldate">'+(item.date?fmtD(item.date):'날짜 미정')+'</div>';
+      html += '<div class="tlbook '+(isN?'isnext':'')+'">'+(item.book||'책 미정')+'</div>';
+      html += '<div class="tl-actions">';
+      html += '<button class="tl-btn" onclick="hedit(this.dataset.id)" data-id="'+sid+'">수정</button>';
+      html += '<button class="tl-btn del" onclick="hdel(this.dataset.id)" data-id="'+sid+'">삭제</button>';
+      html += '</div>';
     }
-    tlWrap.appendChild(div);
+    html += '</div></div>';
   });
-  el.innerHTML='';
-  el.appendChild(tlWrap);
+  html += '</div>';
+  el.innerHTML = html;
 
   if(pgr){
     pgr.style.display=totalP>1?'flex':'none';
@@ -668,6 +641,31 @@ function setHType(id,t){
   const item=histAll.find(h=>String(h.id)===String(id));
   if(item)item._editType=t;
 }
+function hedit(id){editingHistId=id;renderHistPage();}
+function hcancel(){editingHistId=null;renderHistPage();}
+function hdone(id){
+  window._histEditTypes[id]='done';
+  var d=document.getElementById('ed-done-'+id);
+  var n=document.getElementById('ed-next-'+id);
+  if(d)d.style.cssText='flex:1;background:var(--pl);color:var(--pd);border-color:var(--pm);';
+  if(n)n.style.cssText='flex:1;background:transparent;color:var(--ts);border-color:var(--bm);';
+}
+function hnext(id){
+  window._histEditTypes[id]='next';
+  var d=document.getElementById('ed-done-'+id);
+  var n=document.getElementById('ed-next-'+id);
+  if(n)n.style.cssText='flex:1;background:var(--tl);color:var(--td);border-color:#5DCAA5;';
+  if(d)d.style.cssText='flex:1;background:transparent;color:var(--ts);border-color:var(--bm);';
+}
+function hsave(id){
+  var dateEl=document.getElementById('ed-date-'+id);
+  var bookEl=document.getElementById('ed-book-'+id);
+  if(!dateEl||!bookEl){toast('오류: 입력창 없음');return;}
+  var type=window._histEditTypes[id]||'done';
+  doSaveHistEdit(id,dateEl.value,bookEl.value.trim(),type);
+}
+function hdel(id){delHist(id);}
+
 async function doSaveHistEdit(id, date, book, type){
   showL('수정 중...');
   try{
