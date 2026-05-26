@@ -579,7 +579,7 @@ function renderHistPage(){
 
   el.innerHTML='<div class="tlw">'+page.map(item=>{
     const isN=item.type==='next';
-    const isEditing=editingHistId===item.id;
+    const isEditing=String(editingHistId)===String(item.id);
     return `<div class="tli" id="hi-${item.id}">
       <div class="tld ${isN?'dn':'dd'}"></div>
       <div class="tlc ${isN?'isnext':''}">
@@ -615,7 +615,7 @@ function renderHistPage(){
   }
 }
 
-function startHistEdit(id){editingHistId=id;renderHistPage();}
+function startHistEdit(id){editingHistId=String(id);renderHistPage();}
 function cancelHistEdit(){editingHistId=null;renderHistPage();}
 function setHType(id,t){
   const d=document.getElementById(`he-done-${id}`);
@@ -628,13 +628,13 @@ function setHType(id,t){
     n.style.cssText='flex:1;background:var(--tl);color:var(--td);border-color:#5DCAA5;';
     d.style.cssText='flex:1;background:transparent;color:var(--ts);border-color:var(--bm);';
   }
-  const item=histAll.find(h=>h.id===id);
+  const item=histAll.find(h=>String(h.id)===String(id));
   if(item)item._editType=t;
 }
 async function saveHistEdit(id){
   const date=document.getElementById(`he-date-${id}`).value;
   const book=document.getElementById(`he-book-${id}`).value.trim();
-  const item=histAll.find(h=>h.id===id);
+  const item=histAll.find(h=>String(h.id)===String(id));
   const type=item?.(item._editType||item.type)||'done';
   showL('수정 중...');
   try{
