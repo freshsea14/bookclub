@@ -577,35 +577,72 @@ function renderHistPage(){
   if(hpage>=totalP)hpage=totalP-1;
   const page=histAll.slice(hpage*HPP,(hpage+1)*HPP);
 
-  el.innerHTML='<div class="tlw">'+page.map(item=>{
-    const isN=item.type==='next';
-    const isEditing=String(editingHistId)===String(item.id);
-    return `<div class="tli" id="hi-${item.id}">
-      <div class="tld ${isN?'dn':'dd'}"></div>
-      <div class="tlc ${isN?'isnext':''}">
-        <div class="tlbadge ${isN?'bnext':'bdone'}">${isN?'다음 모임':'완료된 모임'}</div>
-        <div class="tldate">${item.date?fmtD(item.date):'날짜 미정'}</div>
-        <div class="tlbook ${isN?'isnext':''}">${item.book||'책 미정'}</div>
-        ${isEditing?`
-        <div class="tl-edit-row">
-          <input type="date" id="he-date-${item.id}" value="${item.date||''}">
-          <input type="text" id="he-book-${item.id}" placeholder="책 제목" value="${item.book||''}">
-          <div style="display:flex;gap:6px;margin-bottom:4px;">
-            <button class="bsm" id="he-done-${item.id}" onclick="setHType('${item.id}','done')" style="${item.type!=='next'?'background:var(--pl);color:var(--pd);border-color:var(--pm);':''}flex:1;">완료된 모임</button>
-            <button class="bsm" id="he-next-${item.id}" onclick="setHType('${item.id}','next')" style="${item.type==='next'?'background:var(--tl);color:var(--td);border-color:#5DCAA5;':''}flex:1;">다음 모임 예고</button>
-          </div>
-          <div class="tl-edit-btns">
-            <button class="bsv" style="flex:1;" onclick="saveHistEdit('${item.id}')">저장</button>
-            <button class="bsm" style="flex:1;" onclick="cancelHistEdit()">취소</button>
-          </div>
-        </div>`:`
-        <div class="tl-actions">
-          <button class="tl-btn" onclick="startHistEdit('${item.id}')">수정</button>
-          <button class="tl-btn del" onclick="delHist('${item.id}')">삭제</button>
-        </div>`}
-      </div>
-    </div>`;
-  }).join('')+'</div>';
+  const tlWrap = document.createElement('div');
+  tlWrap.className = 'tlw';
+  page.forEach(function(item){
+    const isN = item.type==='next';
+    const isEditing = String(editingHistId)===String(item.id);
+    const div = document.createElement('div');
+    div.className = 'tli';
+    div.id = 'hi-'+item.id;
+
+    if(isEditing){
+      div.innerHTML = '<div class="tld '+(isN?'dn':'dd')+'"></div>'
+        +'<div class="tlc '+(isN?'isnext':'')+'">'
+        +'<div class="tlbadge '+(isN?'bnext':'bdone')+'">'+(isN?'다음 모임':'완료된 모임')+'</div>'
+        +'<div class="tl-edit-row">'
+        +'<input type="date" class="edit-date" value="'+(item.date||'')+'">'
+        +'<input type="text" class="edit-book" placeholder="책 제목" value="'+(item.book||'')+'">'
+        +'<div style="display:flex;gap:6px;margin-bottom:4px;">'
+        +'<button class="bsm btn-done" style="flex:1;'+(item.type!=='next'?'background:var(--pl);color:var(--pd);border-color:var(--pm);':'')+'">완료된 모임</button>'
+        +'<button class="bsm btn-next" style="flex:1;'+(item.type==='next'?'background:var(--tl);color:var(--td);border-color:#5DCAA5;':'')+'">다음 모임 예고</button>'
+        +'</div>'
+        +'<div class="tl-edit-btns">'
+        +'<button class="bsv btn-save" style="flex:1;">저장</button>'
+        +'<button class="bsm btn-cancel" style="flex:1;">취소</button>'
+        +'</div></div></div>';
+
+      let curType = item.type;
+      div.querySelector('.btn-done').addEventListener('click', function(){
+        curType='done';
+        div.querySelector('.btn-done').style.cssText='flex:1;background:var(--pl);color:var(--pd);border-color:var(--pm);';
+        div.querySelector('.btn-next').style.cssText='flex:1;background:transparent;color:var(--ts);border-color:var(--bm);';
+      });
+      div.querySelector('.btn-next').addEventListener('click', function(){
+        curType='next';
+        div.querySelector('.btn-next').style.cssText='flex:1;background:var(--tl);color:var(--td);border-color:#5DCAA5;';
+        div.querySelector('.btn-done').style.cssText='flex:1;background:transparent;color:var(--ts);border-color:var(--bm);';
+      });
+      div.querySelector('.btn-save').addEventListener('click', function(){
+        const date=div.querySelector('.edit-date').value;
+        const book=div.querySelector('.edit-book').value.trim();
+        doSaveHistEdit(item.id, date, book, curType);
+      });
+      div.querySelector('.btn-cancel').addEventListener('click', function(){
+        editingHistId=null;renderHistPage();
+      });
+    } else {
+      div.innerHTML = '<div class="tld '+(isN?'dn':'dd')+'"></div>'
+        +'<div class="tlc '+(isN?'isnext':'')+'">'
+        +'<div class="tlbadge '+(isN?'bnext':'bdone')+'">'+(isN?'다음 모임':'완료된 모임')+'</div>'
+        +'<div class="tldate">'+(item.date?fmtD(item.date):'날짜 미정')+'</div>'
+        +'<div class="tlbook '+(isN?'isnext':'')+'">'+(item.book||'책 미정')+'</div>'
+        +'<div class="tl-actions">'
+        +'<button class="tl-btn btn-edit">수정</button>'
+        +'<button class="tl-btn del btn-del">삭제</button>'
+        +'</div></div>';
+
+      div.querySelector('.btn-edit').addEventListener('click', function(){
+        editingHistId=String(item.id);renderHistPage();
+      });
+      div.querySelector('.btn-del').addEventListener('click', function(){
+        delHist(String(item.id));
+      });
+    }
+    tlWrap.appendChild(div);
+  });
+  el.innerHTML='';
+  el.appendChild(tlWrap);
 
   if(pgr){
     pgr.style.display=totalP>1?'flex':'none';
@@ -631,18 +668,12 @@ function setHType(id,t){
   const item=histAll.find(h=>String(h.id)===String(id));
   if(item)item._editType=t;
 }
-async function saveHistEdit(id){
-  const dateEl=document.getElementById('he-date-'+id);
-  const bookEl=document.getElementById('he-book-'+id);
-  if(!dateEl||!bookEl){toast('입력창을 찾을 수 없어요. 다시 시도해주세요.');return;}
-  const date=dateEl.value;
-  const book=bookEl.value.trim();
-  const item=histAll.find(function(h){return String(h.id)===String(id);});
-  const type=item?(item._editType||item.type):'done';
+async function doSaveHistEdit(id, date, book, type){
   showL('수정 중...');
   try{
-    await post({action:'updateHistory',id:String(id),data:{date,book,type}});
-    if(item){item.date=date;item.book=book;item.type=type;delete item._editType;}
+    await post({action:'updateHistory',id:String(id),data:{date:date,book:book,type:type}});
+    const item=histAll.find(function(h){return String(h.id)===String(id);});
+    if(item){item.date=date;item.book=book;item.type=type;}
     editingHistId=null;renderHistPage();
     toast('수정했어요!');
   }catch(e){toast('수정 실패: '+e.message);}
